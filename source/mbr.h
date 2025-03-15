@@ -8,7 +8,7 @@
 #define MBR_PARTITION_TYPE_SLCCMPT 0x0D
 #define MBR_PARTITION_TYPE_MLC 0x83 // Linux ext
 #define NTFS 0x07 
-#define NTFS_HIDDEN 0x27
+#define NTFS_HIDDEN 0x17
 #define MBR_PARTITION_TYPE_MLC_NOSCFM NTFS
 
 typedef struct {
