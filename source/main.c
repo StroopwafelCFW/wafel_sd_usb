@@ -13,32 +13,22 @@
 #include "rednand_config.h"
 #include "sal_partition.h"
 #include "sal_mbr.h"
+#include "wfs.h"
 
 
 // tells crypto to not do crypto (depends on stroopwafel patch)
 #define NO_CRYPTO_HANDLE 0xDEADBEEF
 
-static int (*FSSAL_attach_device)(FSSALAttachDeviceArg*) = (void*)0x10733aa4;
-
 static FSSALAttachDeviceArg extra_attach_arg;
 
 static bool active = false;
-
-#ifdef USE_MLC_KEY
-u32 mlc_size_sectors = 0;
-#endif
-
-static volatile bool learn_mlc_crypto_handle = false;
-static volatile bool learn_usb_crypto_handle = false;
-
 
 void clone_patch_attach_usb_hanlde(FSSALAttachDeviceArg *attach_arg){
     memcpy(&extra_attach_arg, attach_arg, sizeof(extra_attach_arg));
     patch_partition_attach_arg(&extra_attach_arg, DEVTYPE_USB);
     // somehow it doesn't work if we fix the handle pointer
     //extra_server_handle[0x3] = (int) extra_server_handle;
-    learn_usb_crypto_handle = true;
-    int res = FSSAL_attach_device(&extra_attach_arg);
+    FSSALHandle res = FSSAL_attach_device(&extra_attach_arg);
     debug_printf("%s: Attached extra handle. res: 0x%X\n", PLUGIN_NAME, res);
 }
 
@@ -71,6 +61,7 @@ void apply_hai_patches(void){
     //ASM_T_PATCH_K(0x05100198, "nop");
 }
 
+void *sdusb_server_handle = 0;
 void hook_register_sd(trampoline_state *state){
     FSSALAttachDeviceArg *attach_arg = (FSSALAttachDeviceArg*)state->r[0];
 
@@ -81,41 +72,21 @@ void hook_register_sd(trampoline_state *state){
     active = true;
 
     // the virtual USB device has to use the original slot, so the sd goes to the extra slot
+    sdusb_server_handle = attach_arg->server_handle;
     clone_patch_attach_usb_hanlde(attach_arg);
 }
 
+static void wfs_initDeviceParams_exit_hook(trampoline_state *regs){
+    WFS_Device *wfs_device = (WFS_Device*)regs->r[5];
+    FSSALDevice *sal_device = FSSAL_LookupDevice(wfs_device->handle);
+    void *server_handle = sal_device->server_handle;
+    debug_printf("wfs_initDeviceParams_exit_hook server_handle: %p\n", server_handle);
+    if(server_handle == sdusb_server_handle) {
 #ifdef USE_MLC_KEY
-int mlc_attach_hook(int* attach_arg, int r1, int r2, int r3, int (*attach_fun)(int*)){
-    mlc_size_sectors = attach_arg[0xe - 3];
-    learn_mlc_crypto_handle = true;
-    return attach_fun(attach_arg);
-}
+        wfs_device->crypto_key_handle = WFS_KEY_HANDLE_MLC;
+#else
+        wfs_device->crypto_key_handle = WFS_KEY_HANDLE_NOCRYPTO;
 #endif
-
-static void crypto_hook(trampoline_state *state){
-#ifdef USE_MLC_KEY
-    static u32 mlc_crypto_handle = 0;
-    if(learn_mlc_crypto_handle && state->r[5] == mlc_size_sectors){
-        learn_mlc_crypto_handle = false;
-        mlc_crypto_handle = state->r[0];
-        debug_printf("%s: learned mlc crypto handle: 0x%X\n", PLUGIN_NAME, mlc_crypto_handle);
-    }
-#endif
-
-    static u32 usb_crypto_handle = 0;
-    if(state->r[5] == partition_size){
-        if(learn_usb_crypto_handle){
-            learn_usb_crypto_handle = false;
-            usb_crypto_handle = state->r[0];
-            debug_printf("%s: learned mlc crypto handle: 0x%X\n", PLUGIN_NAME,  usb_crypto_handle);
-        }
-        if(usb_crypto_handle == state->r[0]){
-#ifdef USE_MLC_KEY
-            state->r[0] = mlc_crypto_handle;
-#else     
-            state->r[0] = NO_CRYPTO_HANDLE;
-#endif
-        }
     }
 }
 
@@ -140,13 +111,9 @@ void kern_main()
         }
     }
 
-    trampoline_hook_before(0x107bd9a4, hook_register_sd);
-    trampoline_hook_before(0x10740f48, crypto_hook); // hook decrypt call
-    trampoline_hook_before(0x10740fe8, crypto_hook); // hook encrypt call
+    trampoline_hook_before(0x107435f4, wfs_initDeviceParams_exit_hook);
 
-#ifdef USE_MLC_KEY
-    trampoline_blreplace(0x107bdae0, mlc_attach_hook);
-#endif
+    trampoline_hook_before(0x107bd9a4, hook_register_sd);
 
     // somehow it causes crashes when applied from the attach hook
     apply_hai_patches();
