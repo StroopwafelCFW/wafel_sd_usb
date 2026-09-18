@@ -50,12 +50,12 @@ struct FSSALDeviceParams {
 _Static_assert(sizeof(FSSALDeviceParams) == 0x1c8, "FSSALAttachDeviceArg size must be 0x1c8!");
 
 
-typedef int read_func(void *device_handle, u32 lba_hi, u32 lba_lo, u32 blkCount, u32 blockSize, void *buf, void *cb, void* cb_ct);
-typedef int write_func(void *device_handle, u32 lba_hi, u32 lba_lo, u32 blkCount, u32 blockSize, void *buf, void *cb, void* cb_ct);
+typedef int read_func(int device_handle, u32 lba_hi, u32 lba_lo, u32 blkCount, u32 blockSize, void *buf, void *cb, void* cb_ct);
+typedef int write_func(int device_handle, u32 lba_hi, u32 lba_lo, u32 blkCount, u32 blockSize, void *buf, void *cb, void* cb_ct);
 typedef int sync_func(int server_handle, u32 lba_hi, u32 lba_lo, u32 num_blocks, void * cb, void * cb_ctx);
 
 struct FSSALAttachDeviceArg {
-    void *server_handle;
+    int server_handle;
     FSSALDeviceParams params;
     read_func *op_read;
     void *op_read2;
@@ -93,7 +93,7 @@ struct FSSALDevice {
     struct FSLinkedQueueEntry link;
     FSSALHandle handle;
     struct FSSALFilesystem * filesystem;
-    void *server_handle;
+    int server_handle;
     uint32_t device_type;
     uint32_t field5_0x14;
     uint32_t allowed_ops;

@@ -61,7 +61,7 @@ void apply_hai_patches(void){
     //ASM_T_PATCH_K(0x05100198, "nop");
 }
 
-void *sdusb_server_handle = 0;
+int sdusb_server_handle = -1;
 void hook_register_sd(trampoline_state *state){
     FSSALAttachDeviceArg *attach_arg = (FSSALAttachDeviceArg*)state->r[0];
 
@@ -79,7 +79,7 @@ void hook_register_sd(trampoline_state *state){
 static void wfs_initDeviceParams_exit_hook(trampoline_state *regs){
     WFS_Device *wfs_device = (WFS_Device*)regs->r[5];
     FSSALDevice *sal_device = FSSAL_LookupDevice(wfs_device->handle);
-    void *server_handle = sal_device->server_handle;
+    int server_handle = sal_device->server_handle;
     debug_printf("wfs_initDeviceParams_exit_hook server_handle: %p\n", server_handle);
     if(server_handle == sdusb_server_handle) {
 #ifdef USE_MLC_KEY

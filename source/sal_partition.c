@@ -21,12 +21,12 @@ static sync_func *real_sync;
     (low) = (unsigned int)(combined & 0xFFFFFFFF); \
 } while (0)
 
-int read_wrapper(void *device_handle, u32 lba_hi, u32 lba_lo, u32 blkCount, u32 blockSize, void *buf, void *cb, void* cb_ctx){
+int read_wrapper(int device_handle, u32 lba_hi, u32 lba_lo, u32 blkCount, u32 blockSize, void *buf, void *cb, void* cb_ctx){
     ADD_OFFSET(lba_hi, lba_lo);
     return real_read(device_handle, lba_hi, lba_lo, blkCount, blockSize, buf, cb, cb_ctx);
 }
 
-int write_wrapper(void *device_handle, u32 lba_hi, u32 lba_lo, u32 blkCount, u32 blockSize, void *buf, void *cb, void* cb_ctx){
+int write_wrapper(int device_handle, u32 lba_hi, u32 lba_lo, u32 blkCount, u32 blockSize, void *buf, void *cb, void* cb_ctx){
     ADD_OFFSET(lba_hi, lba_lo);
     int ret = real_write(device_handle, lba_hi, lba_lo, blkCount, blockSize, buf, cb, cb_ctx);
     //debug_printf("WFSWRITE: %u, %u\n", lba_lo, blkCount);
@@ -40,13 +40,13 @@ int sync_wrapper(int server_handle, u32 lba_hi, u32 lba_lo, u32 num_blocks, void
 }
 
 
-static void readop2_crash(int *device_handle, u32 lba_hi, u32 lba, u32 blkCount, u32 blockSize, void *buf, void *cb, void* cb_ctx){
-    debug_printf("%s ERROR: readop2 was called!!!! handle: %p type: %u\n", PLUGIN_NAME, device_handle, device_handle[5]);
+static void readop2_crash(int device_handle, u32 lba_hi, u32 lba, u32 blkCount, u32 blockSize, void *buf, void *cb, void* cb_ctx){
+    debug_printf("%s ERROR: readop2 was called!!!! handle: %p\n", PLUGIN_NAME, device_handle);
     crash_and_burn();
 }
 
-static void writeop2_crash(int *device_handle, u32 lba_hi, u32 lba, u32 blkCount, u32 blockSize, void *buf, void *cb, void* cb_ctx){
-    debug_printf("%s ERROR: readop2 was called!!!! handle: %p type: %u\n", PLUGIN_NAME, device_handle, device_handle[5]);
+static void writeop2_crash(int device_handle, u32 lba_hi, u32 lba, u32 blkCount, u32 blockSize, void *buf, void *cb, void* cb_ctx){
+    debug_printf("%s ERROR: readop2 was called!!!! handle: %p\n", PLUGIN_NAME, device_handle);
     crash_and_burn();
 }
 
